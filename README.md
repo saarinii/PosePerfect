@@ -48,3 +48,9 @@ If detected, it extracts the region of interest (ROI), segments it using SAM, an
 What it does: Modifies the rotation of the segmented object.
 How it works: Takes the segmented image and user-defined pose parameters (azimuth and polar angles). Azimuth controls rotation around the vertical axis, and polar controls rotation along the object's depth.
 Output: A new image with the object's pose adjusted according to the specified angles.
+
+![chair](https://github.com/user-attachments/assets/ee374a3d-8f7c-430e-a3a2-94301abb5a97)
+
+![rotated_chair (3)](https://github.com/user-attachments/assets/1f350b35-5f22-42e7-a663-05728f09177d)
+
+
