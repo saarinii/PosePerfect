@@ -50,6 +50,7 @@ How it works: Takes the segmented image and user-defined pose parameters (azimut
 Output: A new image with the object's pose adjusted according to the specified angles.
 
 ![chair](https://github.com/user-attachments/assets/ee374a3d-8f7c-430e-a3a2-94301abb5a97)
+![isolated_chair](https://github.com/user-attachments/assets/a2310af0-6922-494f-8164-12f29c160730)
 
 ![rotated_chair (3)](https://github.com/user-attachments/assets/1f350b35-5f22-42e7-a663-05728f09177d)
 
