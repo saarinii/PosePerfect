@@ -1,110 +1,92 @@
+import argparse
+import torch
 import os
 import cv2
 import numpy as np
-import torch
-import argparse
-import matplotlib.pyplot as plt
+from PIL import Image
 from segment_anything import sam_model_registry, SamAutomaticMaskGenerator
-
-# Configuration
-CHECKPOINT_PATH = '/content/weights/sam_vit_h_4b8939.pth'
-MODEL_TYPE = 'vit_h'
-DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
-
-# Load SAM model
-sam = sam_model_registry[MODEL_TYPE](checkpoint=CHECKPOINT_PATH).to(device=DEVICE)
-mask_generator = SamAutomaticMaskGenerator(sam)
+from diffusers import StableDiffusionInpaintPipeline
 
 # Load YOLOv5 model
 model = torch.hub.load('ultralytics/yolov5', 'yolov5s', pretrained=True)
 
-def display_image(image_path):
-    """Display an image given its path."""
-    image = cv2.imread(image_path)
-    if image is not None:
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        plt.imshow(image)
-        plt.axis('off')
-        plt.show()
-    else:
-        print(f"Error: Image at {image_path} could not be loaded.")
+# Device configuration
+DEVICE = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
-def detect_and_segment(image_path, target_object):
-    """Detect the target object and segment it using SAM."""
+# Function to detect object using YOLOv5
+def detect_and_segment(image_path, target_object, sam_checkpoint, model_type):
+    # Load the image
     img = cv2.imread(image_path)
-    if img is None:
-        print(f"Error: Image at {image_path} could not be loaded.")
-        return None
-
+    
     # Detect objects using YOLOv5
     results = model(img)
     labels, cords = results.xyxyn[0][:, -1], results.xyxyn[0][:, :-1]
+    object_detected = False
     
     # Iterate through detected objects to find the target object
     for label, cord in zip(labels, cords):
         if model.names[int(label)] == target_object:
+            object_detected = True
             x1, y1, x2, y2, conf = cord
+            print(f"{target_object.capitalize()} detected with confidence {conf:.2f} at location: ({x1:.2f}, {y1:.2f}, {x2:.2f}, {y2:.2f})")
+            
+            # Extract ROI
             h, w = img.shape[:2]
             x1, y1, x2, y2 = int(x1 * w), int(y1 * h), int(x2 * w), int(y2 * h)
-
-            # Segment the ROI using SAM
             roi = img[y1:y2, x1:x2]
-            image_rgb = cv2.cvtColor(roi, cv2.COLOR_BGR2RGB)
-            sam_result = mask_generator.generate(image_rgb)
-            if not sam_result:
-                print("No segments found in the ROI.")
-                return None
-
-            # Find and apply the largest mask
-            largest_mask = max(sam_result, key=lambda mask: np.sum(mask['segmentation']))['segmentation'].astype(np.uint8) * 255
             
-            # Process the image
-            return process_image(img, largest_mask, x1, y1, x2, y2)
+            # Segment the ROI using SAM
+            sam = sam_model_registry[model_type](checkpoint=sam_checkpoint).to(DEVICE)
+            mask_generator = SamAutomaticMaskGenerator(sam)
+            masks = mask_generator.generate(roi)
+            
+            # Select the mask with the highest score (confidence)
+            best_mask = max(masks, key=lambda x: x['score'])
+            segmented_img = (best_mask['segmentation'] * 255).astype(np.uint8)
+            return segmented_img, (x1, y1, x2, y2)
 
-    print(f"No {target_object} detected.")
-    return None
+    if not object_detected:
+        raise ValueError(f"{target_object} not detected in the image.")
+    
+# Function for inpainting using Diffusers
+def inpaint_with_diffusers(image_path, mask, output_path):
+    pipe = StableDiffusionInpaintPipeline.from_pretrained("runwayml/stable-diffusion-inpainting", torch_dtype=torch.float16).to(DEVICE)
+    
+    # Load the input image and mask
+    image = Image.open(image_path).convert("RGB")
+    mask_image = Image.fromarray(mask).convert("L")
+    
+    # Inpaint the image
+    result = pipe(prompt="inpainting", image=image, mask_image=mask_image).images[0]
+    
+    # Save the output
+    result.save(output_path)
+    print(f"Inpainted image saved at: {output_path}")
 
-def process_image(original_image, mask, x1, y1, x2, y2):
-    """Process the image to replace the detected object."""
-    full_mask = np.zeros(original_image.shape[:2], dtype=np.uint8)
-    full_mask[y1:y2, x1:x2] = mask
-
-    # Create a white background for the object
-    white_object = np.ones_like(original_image) * 255
-    object_area = cv2.bitwise_and(white_object, white_object, mask=full_mask)
-
-    # Combine the white object with the rest of the original image
-    rest_of_image = cv2.bitwise_and(original_image, original_image, mask=cv2.bitwise_not(full_mask))
-    final_result = cv2.add(object_area, rest_of_image)
-
-    # Save and display the final image
-    output_path = './processed_image.jpg'
-    cv2.imwrite(output_path, final_result)
-    print(f"Processed image saved as '{output_path}'.")
-
-    if os.path.exists(output_path):
-        display_image(output_path)
-
-    return output_path
+# Argument parser to handle inputs
+def parse_args():
+    parser = argparse.ArgumentParser(description="Object Detection, Segmentation, and Inpainting Script")
+    parser.add_argument('--image', type=str, required=True, help='Path to the input image.')
+    parser.add_argument('--class', type=str, required=True, help='Class of the object to detect (e.g., chair).')
+    parser.add_argument('--azimuth', type=int, required=True, help='Azimuth angle adjustment (e.g., +72).')
+    parser.add_argument('--polar', type=int, required=True, help='Polar angle adjustment (e.g., +0).')
+    parser.add_argument('--output', type=str, required=True, help='Path to save the output image.')
+    parser.add_argument('--sam_checkpoint', type=str, required=True, help='Path to the SAM model checkpoint.')
+    parser.add_argument('--model_type', type=str, default="vit_h", help='SAM model type (e.g., vit_h).')
+    return parser.parse_args()
 
 def main():
-    parser = argparse.ArgumentParser(description="Detect and replace objects in an image.")
-    parser.add_argument('--image', type=str, required=True, help="Path to the input image.")
-    parser.add_argument('--class', type=str, required=True, help="Target object class to detect.")
-    parser.add_argument('--output', type=str, default='./generated.png', help="Output path for the generated image.")
-
-    args = parser.parse_args()
-
-    image_path = args.image
-    target_object = args.class
-    output_path = args.output
-
-    mask_path = detect_and_segment(image_path, target_object)
-
-    if mask_path:
-        print(f"Final image saved at: {mask_path}")
-    else:
-        print("No image was generated.")
+    args = parse_args()
+    
+    # Detect and segment the target object
+    segmented_img, coords = detect_and_segment(args.image, args.class, args.sam_checkpoint, args.model_type)
+    
+    # Save the segmented image for visualization (optional)
+    segmented_output = args.output.replace('.png', '_segmented.png')
+    cv2.imwrite(segmented_output, segmented_img)
+    
+    # Perform inpainting on the segmented image
+    inpaint_with_diffusers(args.image, segmented_img, args.output)
 
 if __name__ == "__main__":
     main()
