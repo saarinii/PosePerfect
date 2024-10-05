@@ -51,7 +51,9 @@ Output: A new image with the object's pose adjusted according to the specified a
 
 ![chair](https://github.com/user-attachments/assets/ee374a3d-8f7c-430e-a3a2-94301abb5a97)
 ![isolated_chair](https://github.com/user-attachments/assets/a2310af0-6922-494f-8164-12f29c160730)
-
 ![rotated_chair (3)](https://github.com/user-attachments/assets/1f350b35-5f22-42e7-a663-05728f09177d)
+
+![highlighted_chair_white](https://github.com/user-attachments/assets/8c7b1ddf-d1a8-401a-bf62-f8f9697fd091)
+![replaced_chair](https://github.com/user-attachments/assets/e3047eca-f88a-466d-80c5-a45fbf67f72f)
 
 
