@@ -5,8 +5,11 @@ PosePerfect is a Python project that allows you to edit the pose of an object wi
 ### PosePerfectT1.ipynb (.ipynb for quicker view of the code and the output), PosePerfectTask1 (to run the code)
 
 What it does: Isolates the target object from the background image.
+
 How it works: Takes an input image and a text prompt specifying the object class (e.g., chair, table).
+
 Output: A segmented image with a red mask highlighting the object's boundaries.
+
 This code utilizes YOLOv5 for object detection and the Segment Anything Model (SAM) for segmentation to detect, segment, and visually highlight specified objects in images.
 
 ### Key Components
@@ -64,9 +67,50 @@ Replace ./example.jpg with the path to your input image, "chair" with the object
 
 ## Pose Editing: 
 ### PosePerfectT2.ipynb (.ipynb for quicker view of the code and the output), PosePerfectTask2 (to run the code)
-What it does: Modifies the rotation of the segmented object.
-How it works: Takes the segmented image and user-defined pose parameters (azimuth and polar angles). Azimuth controls rotation around the vertical axis, and polar controls rotation along the object's depth.
-Output: A new image with the object's pose adjusted according to the specified angles.
+What it does:
+Detects a target object in an image, segments it, and then uses inpainting to modify the image based on the mask of the detected object.
+
+How it works:
+The script accepts an input image and a text prompt specifying the object class (e.g., chair, table). It uses YOLOv5 to detect the specified object, SAM to generate a mask around the object, and Stable Diffusion inpainting to modify the image based on the mask.
+
+Output:
+An inpainted image where the specified object is detected, segmented, and modified (e.g., filled in or removed) using Stable Diffusion. The output is saved as a new image file.
+
+### Key Components
+
+#### Library Imports:
+
+OpenCV (cv2): For image processing (reading, writing, and displaying).
+NumPy (np): For numerical operations on image data.
+Torch: For loading and running the YOLOv5, SAM, and Stable Diffusion models.
+PIL (Pillow): For handling images in the inpainting process.
+Diffusers: To handle the Stable Diffusion inpainting pipeline.
+
+#### Configuration:
+
+The script checks if CUDA is available to run models on a GPU.
+It specifies a pre-trained YOLOv5 model from Ultralytics for object detection.
+The Segment Anything Model (SAM) is loaded using a checkpoint, with its type (e.g., vit_h) specified.
+
+#### Models:
+
+YOLOv5: Loaded from Ultralytics, this pre-trained model detects objects in the input image and extracts the region of interest (ROI) for further segmentation.
+SAM (Segment Anything Model): SAM is used to generate a mask around the detected object, allowing for precise segmentation.
+Stable Diffusion Inpainting: Uses the diffusers library to apply inpainting on the segmented area, modifying the image based on the generated mask.
+Detection and Segmentation Function:
+
+Detecting Objects:
+The script reads an image and detects objects using YOLOv5, identifying the specified object class by its label (e.g., chair). The detected object's coordinates are used to extract the ROI.
+
+Segmentation:
+SAM is employed to generate a mask for the object within the ROI, and the best mask (highest confidence) is selected for further processing.
+
+Inpainting:
+The mask is applied to the image, and Stable Diffusion is used to perform inpainting on the segmented region. This modifies the image based on the prompt and mask (e.g., removing or replacing the object).
+
+#### Image Saving and Output:
+The script saves the segmented mask and the final inpainted image as separate output files, ensuring you get both the segmented and modified versions of the input image.
+
 
 ![chair](https://github.com/user-attachments/assets/ee374a3d-8f7c-430e-a3a2-94301abb5a97)
 ![isolated_chair](https://github.com/user-attachments/assets/a2310af0-6922-494f-8164-12f29c160730)
