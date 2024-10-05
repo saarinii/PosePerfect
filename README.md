@@ -94,4 +94,6 @@ pip install -r requirements.txt
 python run.py --image ./example.jpg --class "chair" --azimuth +72 --polar +0 --output ./generated.png
 ```
 Replace ./example.jpg with the path to your input image, "chair" with the object class you want to segment, ./generated.png with the desired output path, and '--azimuth +72 --polar +0' with the angle you want to rotate the object to. 
-
+## My trials
+To look more into my learning journey and what all the experimenting and trial and errors I had to do to make this project and a lot of my mistakes head to 
+### AvatarAssignmentAllMyTrys.ipynb 
