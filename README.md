@@ -43,7 +43,7 @@ If detected, it extracts the region of interest (ROI), segments it using SAM, an
 
 
 
-## Pose Editing:
+## Pose Editing: PosePerfectT2.ipynb
 
 What it does: Modifies the rotation of the segmented object.
 How it works: Takes the segmented image and user-defined pose parameters (azimuth and polar angles). Azimuth controls rotation around the vertical axis, and polar controls rotation along the object's depth.
