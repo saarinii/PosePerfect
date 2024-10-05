@@ -41,7 +41,25 @@ If detected, it extracts the region of interest (ROI), segments it using SAM, an
 ![chair](https://github.com/user-attachments/assets/ec8ac2c6-1ce0-4379-8c3d-1a7f555ea1be)
 ![highlighted_chair](https://github.com/user-attachments/assets/d8aef62b-5aa1-46ec-9c1f-ed89588a32dc)
 
-
+## SetUp
+1. Open VSCode 
+2. Copy the given command
+```shell
+git clone https://github.com/saarinii/PosePerfect.git
+```
+3. Navigate to the project directory:
+```shell
+cd PosePerfectTask1
+```
+4. Install the required packages:
+```shell
+pip install -r requirements.txt
+```
+5. You can now run the script as follows::
+```shell
+python run.py --image ./example.jpg --class "chair" --output ./generated.png
+```
+Replace ./example.jpg with the path to your input image, "chair" with the object class you want to segment, and ./generated.png with the desired output path.
 
 ## Pose Editing: PosePerfectT2.ipynb
 
@@ -56,4 +74,23 @@ Output: A new image with the object's pose adjusted according to the specified a
 ![highlighted_chair_white](https://github.com/user-attachments/assets/8c7b1ddf-d1a8-401a-bf62-f8f9697fd091)
 ![replaced_chair](https://github.com/user-attachments/assets/e3047eca-f88a-466d-80c5-a45fbf67f72f)
 
+## SetUp
+1. Open VSCode 
+2. Copy the given command
+```shell
+git clone https://github.com/saarinii/PosePerfect.git
+```
+3. Navigate to the project directory:
+```shell
+cd PosePerfectTask2
+```
+4. Install the required packages:
+```shell
+pip install -r requirements.txt
+```
+5. You can now run the script as follows::
+```shell
+python run.py --image ./example.jpg --class "chair" --azimuth +72 --polar +0 --output ./generated.png
+```
+Replace ./example.jpg with the path to your input image, "chair" with the object class you want to segment, ./generated.png with the desired output path, and '--azimuth +72 --polar +0' with the angle you want to rotate the object to. 
 
