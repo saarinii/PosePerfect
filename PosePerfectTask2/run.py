@@ -1,92 +1,98 @@
-import argparse
-import torch
 import os
 import cv2
 import numpy as np
+import torch
 from PIL import Image
+import argparse
 from segment_anything import sam_model_registry, SamAutomaticMaskGenerator
-from diffusers import StableDiffusionInpaintPipeline
+from diffusers import DiffusionPipeline, EulerAncestralDiscreteScheduler
 
-# Load YOLOv5 model
-model = torch.hub.load('ultralytics/yolov5', 'yolov5s', pretrained=True)
-
-# Device configuration
+# Define device and models globally
 DEVICE = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+CHECKPOINT_PATH = './weights/sam_vit_h_4b8939.pth'
+MODEL_TYPE = "vit_h"
 
-# Function to detect object using YOLOv5
-def detect_and_segment(image_path, target_object, sam_checkpoint, model_type):
-    # Load the image
+# Load models only once
+yolo_model = torch.hub.load('ultralytics/yolov5', 'yolov5s', pretrained=True)
+sam_model = sam_model_registry[MODEL_TYPE](checkpoint=CHECKPOINT_PATH).to(device=DEVICE)
+mask_generator = SamAutomaticMaskGenerator(sam_model)
+
+# Function to detect objects and segment using SAM
+def detect_and_segment(image_path, target_object):
     img = cv2.imread(image_path)
-    
-    # Detect objects using YOLOv5
-    results = model(img)
+    results = yolo_model(img)
     labels, cords = results.xyxyn[0][:, -1], results.xyxyn[0][:, :-1]
-    object_detected = False
-    
-    # Iterate through detected objects to find the target object
+
+    h, w = img.shape[:2]
     for label, cord in zip(labels, cords):
-        if model.names[int(label)] == target_object:
-            object_detected = True
+        if yolo_model.names[int(label)] == target_object:
             x1, y1, x2, y2, conf = cord
-            print(f"{target_object.capitalize()} detected with confidence {conf:.2f} at location: ({x1:.2f}, {y1:.2f}, {x2:.2f}, {y2:.2f})")
-            
-            # Extract ROI
-            h, w = img.shape[:2]
             x1, y1, x2, y2 = int(x1 * w), int(y1 * h), int(x2 * w), int(y2 * h)
             roi = img[y1:y2, x1:x2]
-            
-            # Segment the ROI using SAM
-            sam = sam_model_registry[model_type](checkpoint=sam_checkpoint).to(DEVICE)
-            mask_generator = SamAutomaticMaskGenerator(sam)
-            masks = mask_generator.generate(roi)
-            
-            # Select the mask with the highest score (confidence)
-            best_mask = max(masks, key=lambda x: x['score'])
-            segmented_img = (best_mask['segmentation'] * 255).astype(np.uint8)
-            return segmented_img, (x1, y1, x2, y2)
 
-    if not object_detected:
-        raise ValueError(f"{target_object} not detected in the image.")
-    
-# Function for inpainting using Diffusers
-def inpaint_with_diffusers(image_path, mask, output_path):
-    pipe = StableDiffusionInpaintPipeline.from_pretrained("runwayml/stable-diffusion-inpainting", torch_dtype=torch.float16).to(DEVICE)
-    
-    # Load the input image and mask
-    image = Image.open(image_path).convert("RGB")
-    mask_image = Image.fromarray(mask).convert("L")
-    
-    # Inpaint the image
-    result = pipe(prompt="inpainting", image=image, mask_image=mask_image).images[0]
-    
-    # Save the output
+            # Segment ROI using SAM
+            image_rgb = cv2.cvtColor(roi, cv2.COLOR_BGR2RGB)
+            sam_result = mask_generator.generate(image_rgb)
+            if not sam_result:
+                return None
+
+            largest_mask = max(sam_result, key=lambda mask: np.sum(mask['segmentation']))
+            mask = largest_mask['segmentation'].astype(np.uint8) * 255
+
+            # Apply mask
+            segmented_object = cv2.bitwise_and(roi, roi, mask=mask)
+            return segmented_object
+
+    return None
+
+# Function to generate rotated image using diffusion model
+def rotate_object(image_path, azimuth, polar, output_path):
+    pipe = DiffusionPipeline.from_pretrained(
+        "sudo-ai/zero123plus-v1.1", 
+        custom_pipeline="sudo-ai/zero123plus-pipeline",
+        torch_dtype=torch.float16
+    )
+    pipe.scheduler = EulerAncestralDiscreteScheduler.from_config(
+        pipe.scheduler.config, timestep_spacing='trailing'
+    )
+    pipe.to(DEVICE)
+
+    cond_image = Image.open(image_path).convert("RGBA")
+    prompt = f"Change pose of the object by azimuth {azimuth} degrees; polar {polar} degrees."
+
+    result = pipe(cond_image, prompt=prompt, num_inference_steps=28).images[0]
     result.save(output_path)
-    print(f"Inpainted image saved at: {output_path}")
 
-# Argument parser to handle inputs
-def parse_args():
-    parser = argparse.ArgumentParser(description="Object Detection, Segmentation, and Inpainting Script")
-    parser.add_argument('--image', type=str, required=True, help='Path to the input image.')
-    parser.add_argument('--class', type=str, required=True, help='Class of the object to detect (e.g., chair).')
-    parser.add_argument('--azimuth', type=int, required=True, help='Azimuth angle adjustment (e.g., +72).')
-    parser.add_argument('--polar', type=int, required=True, help='Polar angle adjustment (e.g., +0).')
-    parser.add_argument('--output', type=str, required=True, help='Path to save the output image.')
-    parser.add_argument('--sam_checkpoint', type=str, required=True, help='Path to the SAM model checkpoint.')
-    parser.add_argument('--model_type', type=str, default="vit_h", help='SAM model type (e.g., vit_h).')
-    return parser.parse_args()
+# Main function to handle command-line arguments
+def main(args):
+    input_image_path = args.image
+    target_class = args.class_name
+    azimuth = args.azimuth
+    polar = args.polar
+    output_image_path = args.output
 
-def main():
-    args = parse_args()
-    
-    # Detect and segment the target object
-    segmented_img, coords = detect_and_segment(args.image, args.class, args.sam_checkpoint, args.model_type)
-    
-    # Save the segmented image for visualization (optional)
-    segmented_output = args.output.replace('.png', '_segmented.png')
-    cv2.imwrite(segmented_output, segmented_img)
-    
-    # Perform inpainting on the segmented image
-    inpaint_with_diffusers(args.image, segmented_img, args.output)
+    print(f"Processing image: {input_image_path}, looking for: {target_class}")
 
+    # Detect and segment the object
+    segmented_object = detect_and_segment(input_image_path, target_class)
+    if segmented_object is not None:
+        segmented_path = "./segmented_object.png"
+        cv2.imwrite(segmented_path, segmented_object)
+
+        # Rotate the object using the specified azimuth and polar angles
+        rotate_object(segmented_path, azimuth, polar, output_image_path)
+        print(f"Rotated object saved to {output_image_path}")
+    else:
+        print(f"No {target_class} detected in {input_image_path}.")
+
+# Command-line argument parsing
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Object Detection, Segmentation, and Rotation")
+    parser.add_argument('--image', required=True, help="Path to input image")
+    parser.add_argument('--class', dest="class_name", required=True, help="Object class to detect (e.g., 'chair')")
+    parser.add_argument('--azimuth', type=int, required=True, help="Azimuth angle for rotation")
+    parser.add_argument('--polar', type=int, required=True, help="Polar angle for rotation")
+    parser.add_argument('--output', required=True, help="Path to save the generated image")
+    args = parser.parse_args()
+    
+    main(args)
