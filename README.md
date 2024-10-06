@@ -2,7 +2,7 @@
 PosePerfect is a Python project that allows you to edit the pose of an object within a scene using cutting-edge generative AI techniques. This project focuses on two key tasks:
 
 ## Object Segmentation: 
-### PosePerfectT1.ipynb (.ipynb for quicker view of the code and the output), PosePerfectTask1 (to run the code)
+### PosePerfectT1.ipynb (.ipynb for quicker view of the code and the output), PosePerfectTask1/run.py (to run the code)
 
 What it does: Isolates the target object from the background image.
 
@@ -68,7 +68,7 @@ python run.py --image ./example.jpg --class "chair" --output ./generated.png
 Replace ./example.jpg with the path to your input image, "chair" with the object class you want to segment, and ./generated.png with the desired output path.
 
 ## Pose Editing: 
-### PosePerfectT2.ipynb (.ipynb for quicker view of the code and the output), PosePerfectTask2 (to run the code)
+### PosePerfectT2.ipynb (.ipynb for quicker view of the code and the output), PosePerfectTask2/run.py (to run the code)
 What it does:
 Detects a target object in an image, segments it, and then uses inpainting to modify the image based on the mask of the detected object.
 
