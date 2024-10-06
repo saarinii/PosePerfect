@@ -1,41 +1,28 @@
-import os
-import argparse
 import cv2
 import numpy as np
 import torch
-import matplotlib.pyplot as plt
+import argparse
 from segment_anything import sam_model_registry, SamAutomaticMaskGenerator
+import os
+
+# Configuration
+CHECKPOINT_PATH = '/content/weights/sam_vit_h_4b8939.pth'  # Path to your SAM model
+MODEL_TYPE = 'vit_h'  # Specify your SAM model type
+DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'  # Use GPU if available
+
+# Load SAM model
+sam = sam_model_registry[MODEL_TYPE](checkpoint=CHECKPOINT_PATH).to(device=DEVICE)
+mask_generator = SamAutomaticMaskGenerator(sam)
 
 # Load YOLOv5 model
 model = torch.hub.load('ultralytics/yolov5', 'yolov5s', pretrained=True)
 
-# Function to display the image
-def display_image(image_path):
-    image = cv2.imread(image_path)
-    if image is not None:
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB
-        plt.imshow(image)
-        plt.axis('off')  # Hide axis
-        plt.show()
-    else:
-        print(f"Error: Image at {image_path} could not be loaded.")
-
-# Function to detect an object, segment it using SAM, and save the image with the red mask
 def detect_and_segment(image_path, target_object, output_path):
-    # Configuration
-    CHECKPOINT_PATH = './weights/sam_vit_h_4b8939.pth'  # Path to your SAM model weights
-    MODEL_TYPE = 'vit_h'  # Specify your SAM model type
-    DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'  # Use GPU if available
-
-    # Load SAM model
-    sam = sam_model_registry[MODEL_TYPE](checkpoint=CHECKPOINT_PATH).to(device=DEVICE)
-    mask_generator = SamAutomaticMaskGenerator(sam)
-
     # Load the image
     img = cv2.imread(image_path)
     if img is None:
         print(f"Error: Image at {image_path} could not be loaded.")
-        return
+        return None
 
     # Detect objects using YOLOv5
     results = model(img)
@@ -60,7 +47,7 @@ def detect_and_segment(image_path, target_object, output_path):
             sam_result = mask_generator.generate(image_rgb)
             if not sam_result:
                 print("No segments found in the ROI.")
-                return
+                return None
 
             # Display the number of segments found
             print(f"Found {len(sam_result)} segments.")
@@ -77,37 +64,48 @@ def detect_and_segment(image_path, target_object, output_path):
 
             print(f"Applying the largest mask with area {max_area}.")
 
-            # Create a red highlight for the segmented object
-            red_highlight = np.zeros_like(roi)
-            red_highlight[:, :, 2] = 255  # Set Red channel to 255
+            # Resize the largest mask to fit the original image
+            full_mask = np.zeros((h, w), dtype=np.uint8)
+            full_mask[y1:y2, x1:x2] = largest_mask
 
-            # Blend the original ROI with the red highlight using the mask
-            highlighted_roi = cv2.bitwise_and(red_highlight, red_highlight, mask=largest_mask)
-            highlighted_roi = cv2.addWeighted(highlighted_roi, 0.5, roi, 0.5, 0)
+            # Invert the mask to isolate the object
+            inverted_mask = cv2.bitwise_not(full_mask)
 
-            # Replace the ROI in the original image with the highlighted version
-            img[y1:y2, x1:x2] = highlighted_roi
+            # Create a red background for the object
+            red_mask = np.zeros_like(img)  # Create a black image
+            red_mask[:] = [0, 0, 255]  # Fill it with red color
 
-            # Save the final image with red-highlighted object
-            cv2.imwrite(output_path, img)
-            print(f"Image with segmented object saved as '{output_path}'.")
+            # Apply the red to the object and leave the rest of the image intact
+            object_red = cv2.bitwise_and(red_mask, red_mask, mask=full_mask)
+            rest_of_image = cv2.bitwise_and(img, img, mask=inverted_mask)
 
-            break
+            # Combine the red object with the rest of the original image
+            final_result = cv2.add(object_red, rest_of_image)
+
+            # Save the final image with the red mask
+            cv2.imwrite(output_path, final_result)
+            print(f"Image with the {target_object} highlighted in red saved as '{output_path}'.")
+
+            return output_path
 
     if not object_detected:
         print(f"No {target_object} detected.")
-
-# Main function to handle command-line arguments and run the process
-def main():
-    parser = argparse.ArgumentParser(description="Object Detection and Segmentation with Red Mask")
-    parser.add_argument('--image', required=True, help="Path to the input image")
-    parser.add_argument('--class', required=True, help="Object class to detect (e.g., 'chair')")
-    parser.add_argument('--output', required=True, help="Path to save the output image with red mask")
-    
-    args = parser.parse_args()
-
-    # Call the detection and segmentation function
-    detect_and_segment(args.image, args.class, args.output)
+        return None
 
 if __name__ == "__main__":
-    main()
+    # Set up argument parser
+    parser = argparse.ArgumentParser(description="Highlight an object in an image with a red mask.")
+    parser.add_argument("--image", required=True, help="Path to the input image.")
+    parser.add_argument("--class", required=True, help="Class name of the object to highlight.")
+    parser.add_argument("--output", required=True, help="Path to save the output image.")
+
+    # Parse the command line arguments
+    args = parser.parse_args()
+
+    # Run the detection and segmentation
+    mask_path = detect_and_segment(args.image, args.class, args.output)
+
+    if mask_path:
+        print(f"Final image saved at: {mask_path}")
+    else:
+        print("No image was generated.")
