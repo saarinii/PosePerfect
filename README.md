@@ -43,7 +43,8 @@ The function detects objects in the image and checks for the target object.
 If detected, it extracts the region of interest (ROI), segments it using SAM, and applies a red highlight before saving and displaying the final image.
 
 ![chair](https://github.com/user-attachments/assets/ec8ac2c6-1ce0-4379-8c3d-1a7f555ea1be)
-![highlighted_chair](https://github.com/user-attachments/assets/d8aef62b-5aa1-46ec-9c1f-ed89588a32dc)
+![highlighted_chair_red](https://github.com/user-attachments/assets/5d895fc3-542d-4361-be6f-b4c483629832)
+
 
 ## SetUp
 1. Open VSCode 
