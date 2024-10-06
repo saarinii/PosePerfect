@@ -43,6 +43,7 @@ The function detects objects in the image and checks for the target object.
 If detected, it extracts the region of interest (ROI), segments it using SAM, and applies a red highlight before saving and displaying the final image.
 
 ![chair](https://github.com/user-attachments/assets/ec8ac2c6-1ce0-4379-8c3d-1a7f555ea1be)
+![highlighted_image1](https://github.com/user-attachments/assets/95d69d57-763c-46e0-a61e-2f6257182526)
 ![highlighted_chair_red](https://github.com/user-attachments/assets/5d895fc3-542d-4361-be6f-b4c483629832)
 
 
