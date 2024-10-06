@@ -5,7 +5,7 @@ import torch
 from PIL import Image
 import argparse
 from segment_anything import sam_model_registry, SamAutomaticMaskGenerator
-from diffusers import DiffusionPipeline, EulerAncestralDiscreteScheduler
+from diffusers import DiffusionPipeline, EulerAncestralDiscreteScheduler, StableDiffusionInpaintPipeline
 
 # Define device and models globally
 DEVICE = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -63,6 +63,22 @@ def rotate_object(image_path, azimuth, polar, output_path):
     result = pipe(cond_image, prompt=prompt, num_inference_steps=28).images[0]
     result.save(output_path)
 
+# Function to perform inpainting using Stable Diffusion
+def inpaint_image(input_image_path, mask_image_path, output_path):
+    input_image = Image.open(input_image_path).convert("RGB")
+    mask_image = Image.open(mask_image_path).convert("L")  # Convert mask to grayscale
+    
+    pipe = StableDiffusionInpaintPipeline.from_pretrained("CompVis/stable-diffusion-v1-4").to(DEVICE)
+
+    result_image = pipe(
+        prompt="Blend the area around the object seamlessly into the background to create a natural and cohesive appearance.",
+        image=input_image,
+        mask_image=mask_image,
+        num_inference_steps=1500
+    ).images[0]
+
+    result_image.save(output_path)
+
 # Main function to handle command-line arguments
 def main(args):
     input_image_path = args.image
@@ -70,6 +86,7 @@ def main(args):
     azimuth = args.azimuth
     polar = args.polar
     output_image_path = args.output
+    inpaint = args.inpaint
 
     print(f"Processing image: {input_image_path}, looking for: {target_class}")
 
@@ -82,17 +99,23 @@ def main(args):
         # Rotate the object using the specified azimuth and polar angles
         rotate_object(segmented_path, azimuth, polar, output_image_path)
         print(f"Rotated object saved to {output_image_path}")
+
+        # Optionally perform inpainting
+        if inpaint:
+            inpaint_image(input_image_path, segmented_path, output_image_path)
+            print(f"Inpainted image saved to {output_image_path}")
     else:
         print(f"No {target_class} detected in {input_image_path}.")
 
 # Command-line argument parsing
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Object Detection, Segmentation, and Rotation")
+    parser = argparse.ArgumentParser(description="Object Detection, Segmentation, Rotation, and Inpainting")
     parser.add_argument('--image', required=True, help="Path to input image")
     parser.add_argument('--class', dest="class_name", required=True, help="Object class to detect (e.g., 'chair')")
     parser.add_argument('--azimuth', type=int, required=True, help="Azimuth angle for rotation")
     parser.add_argument('--polar', type=int, required=True, help="Polar angle for rotation")
     parser.add_argument('--output', required=True, help="Path to save the generated image")
+    parser.add_argument('--inpaint', action='store_true', help="Include this flag to apply inpainting after rotation")
     args = parser.parse_args()
     
     main(args)
