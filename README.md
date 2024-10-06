@@ -116,6 +116,8 @@ The script saves the segmented mask and the final inpainted image as separate ou
 
 ![chair](https://github.com/user-attachments/assets/ee374a3d-8f7c-430e-a3a2-94301abb5a97)
 ![isolated_chair](https://github.com/user-attachments/assets/a2310af0-6922-494f-8164-12f29c160730)
+![isolated_chair (1)](https://github.com/user-attachments/assets/2ebdfd22-f601-4fbd-b600-c83dd7eba415)
+
 ![rotated_chair (3)](https://github.com/user-attachments/assets/1f350b35-5f22-42e7-a663-05728f09177d)
 
 ![highlighted_chair_white](https://github.com/user-attachments/assets/8c7b1ddf-d1a8-401a-bf62-f8f9697fd091)
